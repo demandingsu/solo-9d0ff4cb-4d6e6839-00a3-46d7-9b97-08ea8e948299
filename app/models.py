@@ -89,3 +89,64 @@ class CheckResponse(BaseModel):
     clear: list[ClearResult] = Field(default_factory=list)
     failures: list[FetchFailure] = Field(default_factory=list)
     message: Optional[str] = None
+
+
+# ---- 公告变更检测 ---------------------------------------------------------
+
+# 变更检测状态：
+# - baseline_created  首次完整采集，仅建立基线
+# - unchanged         完整采集且与基线一致
+# - changed           完整采集且存在新增/撤下/修改，基线已替换
+# - undetermined      采集不完整，未比较、未替换，旧基线保留
+ChangeStatus = Literal[
+    "baseline_created", "unchanged", "changed", "undetermined"
+]
+
+
+class ChangeRequest(BaseModel):
+    """公告变更检测请求：只需公告列表入口 URL。"""
+
+    announcement_list_url: str = Field(..., description="公告列表页 URL，按入口分别维护基线")
+
+
+class AnnouncementSnapshot(BaseModel):
+    """单条公告参与比较的结构化快照（以详情 URL 标识）。"""
+
+    detail_url: str = Field(..., description="公告详情页 URL，公告的唯一标识")
+    road_id: str
+    direction: str
+    effective_start: str = Field(..., description="生效开始日 ISO 日期")
+    effective_end: Optional[str] = Field(None, description="生效结束日；null 表示长期有效")
+    weekdays: list[int] = Field(..., description="每周封闭日，周一=0 ... 周日=6")
+    clock_start: str = Field(..., description="开始钟点 HH:MM")
+    clock_end: str = Field(..., description="结束钟点 HH:MM")
+    cross_midnight: bool = Field(..., description="是否跨午夜封闭（归属开始当天）")
+
+
+class ChangedAnnouncement(BaseModel):
+    """一条被修改的公告：变更字段及新旧两份快照与来源 URL。"""
+
+    detail_url: str
+    changed_fields: dict[str, dict] = Field(
+        ...,
+        description="字段名 -> {old, new}；字段覆盖路段、方向、生效日期、封闭日、起止钟点",
+    )
+    old: AnnouncementSnapshot
+    new: AnnouncementSnapshot
+
+
+class ChangeResponse(BaseModel):
+    status: ChangeStatus
+    announcement_list_url: str
+    complete: bool = Field(..., description="本次采集是否完整（全部分页与详情成功且无分页异常）")
+    pagination_loop: bool = Field(False, description="是否遇到分页环路")
+    page_limit_hit: bool = Field(False, description="是否达到分页页数上限")
+    pages_fetched: int = 0
+    fetched_announcements: int = Field(0, description="本次成功解析的公告条数")
+    added: list[AnnouncementSnapshot] = Field(default_factory=list, description="基线中没有的新公告（新来源为本次采集）")
+    removed: list[AnnouncementSnapshot] = Field(default_factory=list, description="本次列表中消失的公告（旧来源为上轮基线）")
+    changed: list[ChangedAnnouncement] = Field(default_factory=list, description="同 URL 但比较字段发生变化的公告")
+    failures: list[FetchFailure] = Field(default_factory=list, description="采集问题地址与原因；undetermined 时据此核对")
+    baseline_created_at: Optional[str] = None
+    baseline_updated_at: Optional[str] = None
+    message: Optional[str] = None

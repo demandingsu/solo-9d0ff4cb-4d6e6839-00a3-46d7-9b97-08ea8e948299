@@ -4,6 +4,11 @@ services:
     image: coldchain-closure-checker:latest
     ports:
       - "8000:8000"
+    environment:
+      # SQLite 基线库路径（挂载命名卷，容器重建后基线保留）
+      CLOSURE_BASELINE_DB: /srv/data/baseline.db
+    volumes:
+      - baseline-data:/srv/data
     depends_on:
       sample-site:
         condition: service_started
@@ -21,3 +26,6 @@ services:
 networks:
   closure-net:
     driver: bridge
+
+volumes:
+  baseline-data:

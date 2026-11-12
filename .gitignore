@@ -5,3 +5,7 @@ venv/
 .pytest_cache/
 *.log
 .git/
+data/
+*.db
+*.db-wal
+*.db-shm
