@@ -1,0 +1,23 @@
+services:
+  api:
+    build: .
+    image: coldchain-closure-checker:latest
+    ports:
+      - "8000:8000"
+    depends_on:
+      sample-site:
+        condition: service_started
+    networks:
+      - closure-net
+
+  sample-site:
+    build: ./sample-site
+    image: closure-sample-site:latest
+    ports:
+      - "8080:8080"
+    networks:
+      - closure-net
+
+networks:
+  closure-net:
+    driver: bridge
